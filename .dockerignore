@@ -1,0 +1,10 @@
+.env
+.env.*
+data/
+.git/
+.github/
+__pycache__/
+*.pyc
+README.md
+LICENSE
+docker-compose.yml

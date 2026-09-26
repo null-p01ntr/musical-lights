@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MusicalLights Settings</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header>
+    <h1>Musical<span>Lights</span></h1>
+    <nav><a href="/">Live</a><a href="/settings" class="here">Settings</a></nav>
+  </header>
+  <main>
+    <section>
+      <h2>Lights</h2>
+      <div id="light-list"></div>
+    </section>
+
+    <section>
+      <h2>Add light</h2>
+      <div class="add">
+        <input type="text" id="add-entity" placeholder="light.some_light or switch.some_plug" autocomplete="off" spellcheck="false">
+        <select id="add-band">
+          <option value="bass">Bass</option>
+          <option value="mid">Mid</option>
+          <option value="treble">Treble</option>
+        </select>
+        <button class="primary" id="add-btn">Add</button>
+      </div>
+      <div class="slider" id="add-threshold-row" hidden style="margin-top:10px">
+        <span>Switch threshold</span>
+        <input type="range" id="add-threshold" min="0" max="100" value="80">
+        <output id="add-threshold-out">80%</output>
+      </div>
+      <div class="muted" id="add-hint" style="margin-top:6px"></div>
+    </section>
+
+    <section>
+      <h2>Frequency bands (Hz)</h2>
+      <div style="display:grid;gap:8px">
+        <div class="band-row"><span class="tag bass">bass</span><input type="number" id="bass-lo" min="10" max="22000"><input type="number" id="bass-hi" min="10" max="22000"></div>
+        <div class="band-row"><span class="tag mid">mid</span><input type="number" id="mid-lo" min="10" max="22000"><input type="number" id="mid-hi" min="10" max="22000"></div>
+        <div class="band-row"><span class="tag treble">treble</span><input type="number" id="treble-lo" min="10" max="22000"><input type="number" id="treble-hi" min="10" max="22000"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span class="muted">low → high, applied live while listening</span><div class="spacer"></div>
+        <button id="bands-reset">Defaults</button>
+        <button class="primary" id="bands-save">Save bands</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Response</h2>
+      <div style="display:grid;gap:8px">
+        <div class="slider"><span>Sensitivity</span><input type="range" id="sensitivity" min="0.2" max="3" step="0.1"><output id="sensitivity-out"></output></div>
+        <div class="slider"><span>Smoothing</span><input type="range" id="smoothing" min="0" max="0.95" step="0.05"><output id="smoothing-out"></output></div>
+        <label class="row muted"><input type="checkbox" id="auto_gain"> Auto gain (follow the room's loudness)</label>
+      </div>
+      <h2 style="margin-top:16px">Output pacing</h2>
+      <div class="grid3">
+        <label class="field">Max updates/s per light<input type="number" id="max_rate_hz" min="0.5" max="20" step="0.5"></label>
+        <label class="field">Deadband (%)<input type="number" id="deadband_pct" min="0" max="50"></label>
+        <label class="field">Switch min hold (ms)<input type="number" id="switch_min_hold_ms" min="0" max="10000" step="100"></label>
+        <label class="field">Stop if no audio for (s)<input type="number" id="watchdog_s" min="2" max="120"></label>
+      </div>
+      <label class="row muted" style="margin-top:10px"><input type="checkbox" id="restore_on_stop"> Restore lights to how they were when stopping</label>
+      <div class="row" style="margin-top:10px"><div class="spacer"></div><button class="primary" id="tuning-save">Save</button></div>
+    </section>
+
+    <section>
+      <h2>Home Assistant</h2>
+      <div style="display:grid;gap:10px">
+        <label class="field">URL<input type="url" id="ha-url"></label>
+        <label class="field">Long-lived access token<input type="password" id="ha-token" autocomplete="off" placeholder="paste a token"></label>
+        <label class="field">Session helper entity<input type="text" id="ha-helper" spellcheck="false"></label>
+        <div class="row"><span class="pill" id="ha-pill">HA</span><span class="muted" id="ha-status"></span><div class="spacer"></div><button class="primary" id="ha-save">Save</button></div>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script src="/static/settings.js"></script>
+</body>
+</html>

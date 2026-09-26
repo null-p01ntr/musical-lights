@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MusicalLights</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header>
+    <h1>Musical<span>Lights</span></h1>
+    <nav><a href="/" class="here">Live</a><a href="/settings">Settings</a></nav>
+  </header>
+  <main>
+    <section>
+      <div class="power">
+        <label class="switch">
+          <input type="checkbox" id="power">
+          <span class="track"></span>
+        </label>
+        <div>
+          <div class="power-label" id="power-label">Off</div>
+          <div class="muted" id="power-detail">Toggle to start listening</div>
+        </div>
+        <div class="spacer"></div>
+        <span class="pill" id="ha-pill">HA</span>
+      </div>
+      <div class="error" id="error"></div>
+    </section>
+
+    <section>
+      <h2>Sound</h2>
+      <canvas id="wave"></canvas>
+      <div class="bands">
+        <div class="band bass"><div class="name"><span>Bass</span><span id="lv-bass">0</span></div><div class="meter"><i id="m-bass"></i></div></div>
+        <div class="band mid"><div class="name"><span>Mid</span><span id="lv-mid">0</span></div><div class="meter"><i id="m-mid"></i></div></div>
+        <div class="band treble"><div class="name"><span>Treble</span><span id="lv-treble">0</span></div><div class="meter"><i id="m-treble"></i></div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Musical lights</h2>
+      <div class="lights" id="lights"></div>
+    </section>
+  </main>
+  <script src="/static/live.js"></script>
+</body>
+</html>
