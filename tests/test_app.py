@@ -282,6 +282,51 @@ class E2ETests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(helper_calls, [])            # did not fight the user's off
         await ws.close()
 
+    async def recv_state(self, ws):
+        while True:
+            msg = await asyncio.wait_for(ws.receive_json(), 2)
+            if msg.get("type") == "state":
+                return msg
+
+    async def test_single_source_and_take_control(self):
+        await self.client.post("/api/start")
+        ws1 = await self.client.ws_connect("/ws")
+        ws2 = await self.client.ws_connect("/ws")
+        await ws1.send_json({"type": "levels", "bass": 0.9, "mid": 0, "treble": 0})
+        await self.wait_for(lambda: self.engine.levels["bass"] == 0.9)
+        await ws2.send_json({"type": "levels", "bass": 0.1, "mid": 0, "treble": 0})
+        await asyncio.sleep(0.2)
+        self.assertEqual(self.engine.levels["bass"], 0.9)          # ws2 is not the source
+
+        await ws2.send_json({"type": "claim"})
+        st = await self.recv_state(ws2)
+        while not st["session"]["you_are_source"]:
+            st = await self.recv_state(ws2)
+        await ws1.send_json({"type": "levels", "bass": 0.3, "mid": 0, "treble": 0})
+        await ws2.send_json({"type": "levels", "bass": 0.6, "mid": 0, "treble": 0})
+        await self.wait_for(lambda: self.engine.levels["bass"] == 0.6)
+        await asyncio.sleep(0.2)
+        self.assertEqual(self.engine.levels["bass"], 0.6)          # ws1 was ignored
+        st1 = await self.recv_state(ws1)
+        self.assertFalse(st1["session"]["you_are_source"])
+
+        await ws2.close()                                          # source leaves...
+        await self.wait_for(lambda: self.engine.source is None)
+        status = await (await self.client.get("/api/status")).json()
+        self.assertFalse(status["session"]["source_connected"])
+        self.assertTrue(status["active"])                          # ...session waits for the watchdog
+        await ws1.send_json({"type": "levels", "bass": 0.4, "mid": 0, "treble": 0})
+        await self.wait_for(lambda: self.engine.levels["bass"] == 0.4)   # next sender takes over
+        await ws1.close()
+
+    async def test_claim_without_session_is_ignored(self):
+        ws = await self.client.ws_connect("/ws")
+        await ws.send_json({"type": "claim"})
+        st = await self.recv_state(ws)
+        self.assertFalse(st["active"])
+        self.assertIsNone(self.engine.source)
+        await ws.close()
+
     async def test_levels_ignored_when_idle(self):
         ws = await self.client.ws_connect("/ws")
         await ws.send_json({"type": "levels", "bass": 1, "mid": 1, "treble": 1})

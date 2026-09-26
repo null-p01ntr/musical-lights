@@ -383,6 +383,7 @@ class Engine:
         self.snapshot = {}          # entity_id -> HA state dict at session start
         self.out = {}               # entity_id -> runtime output state
         self.clients = set()
+        self.source = None          # the one browser whose levels drive the session
         self.last_stop_reason = None
         ha.on_helper = self._helper_changed
         ha.on_connect = self._ha_connected
@@ -404,6 +405,7 @@ class Engine:
             self.out = {}
             self.levels = {b: 0.0 for b in BANDS}
             self.last_levels_at = time.monotonic()
+            self.source = None
             self.active = True
             self.last_stop_reason = None
             log.info("session started, %d lights", len(self.snapshot))
@@ -430,6 +432,7 @@ class Engine:
         finally:
             self.snapshot = {}
             self.out = {}
+            self.source = None
             self.busy = False
 
     async def _snap(self, entity_id):
@@ -484,8 +487,15 @@ class Engine:
             log.warning("helper check failed: %s", e)
 
     # -- mapping ---------------------------------------------------------
-    def set_levels(self, levels):
+    def set_levels(self, levels, client=None):
+        """Accept levels only from the session's source. The first client to send after a
+        start becomes the source; anyone else has to claim() it. Two mics interleaving
+        would make every light flicker between two rooms' worth of sound."""
         if not self.active:
+            return
+        if self.source is None:
+            self.source = client
+        elif client is not self.source:
             return
         for b in BANDS:
             try:
@@ -493,6 +503,21 @@ class Engine:
             except (TypeError, ValueError):
                 pass
         self.last_levels_at = time.monotonic()
+
+    def claim(self, client):
+        """'Take control': make this client the source of a running session. The watchdog
+        clock restarts so the new source has time to open its mic."""
+        if not self.active or self.busy:
+            return False
+        self.source = client
+        self.last_levels_at = time.monotonic()
+        log.info("session source claimed by a new client")
+        return True
+
+    def client_gone(self, client):
+        self.clients.discard(client)
+        if self.source is client:
+            self.source = None      # the watchdog decides whether the session ends
 
     @staticmethod
     def target_for(light, level):
@@ -563,7 +588,7 @@ class Engine:
                 await self.broadcast()
 
     # -- browser side ----------------------------------------------------
-    def status(self):
+    def status(self, client=None):
         lights = []
         for l in self.settings.data["lights"]:
             o = self.out.get(l["entity_id"], {})
@@ -571,19 +596,23 @@ class Engine:
                            "kind": l["kind"], "enabled": l["enabled"],
                            "on": bool(o.get("on")) if self.active else None,
                            "brightness": o.get("pct", 0) if self.active else None})
+        idle = round(time.monotonic() - self.last_levels_at, 1) if self.active else None
         return {"type": "state", "active": self.active, "busy": self.busy,
                 "levels": self.levels, "lights": lights,
+                "session": {"you_are_source": client is not None and client is self.source,
+                            "source_connected": self.source is not None,
+                            "idle_s": idle,
+                            "watchdog_s": self.settings.data["output"]["watchdog_s"]},
                 "ha": {"connected": self.ha.connected, "status": self.ha.status,
                        "errors": self.ha.errors, "last_error": self.ha.last_error},
                 "last_stop_reason": self.last_stop_reason}
 
     async def broadcast(self):
-        msg = json.dumps(self.status())
         for ws in list(self.clients):
             try:
-                await ws.send_str(msg)
+                await ws.send_str(json.dumps(self.status(ws)))
             except (ConnectionError, RuntimeError):
-                self.clients.discard(ws)
+                self.client_gone(ws)
 
 
 # ---------------------------------------------------------------- HTTP API
@@ -767,7 +796,7 @@ def make_app(settings=None, ha=None, engine=None):
         ws = web.WebSocketResponse(heartbeat=20)
         await ws.prepare(request)
         engine.clients.add(ws)
-        await ws.send_str(json.dumps(engine.status()))
+        await ws.send_str(json.dumps(engine.status(ws)))
         try:
             async for msg in ws:
                 if msg.type != WSMsgType.TEXT:
@@ -777,9 +806,12 @@ def make_app(settings=None, ha=None, engine=None):
                 except ValueError:
                     continue
                 if data.get("type") == "levels":
-                    engine.set_levels(data)
+                    engine.set_levels(data, ws)
+                elif data.get("type") == "claim":
+                    engine.claim(ws)
+                    await ws.send_str(json.dumps(engine.status(ws)))
         finally:
-            engine.clients.discard(ws)
+            engine.client_gone(ws)
         return ws
 
     app = web.Application(middlewares=[errors_mw])

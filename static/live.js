@@ -23,6 +23,8 @@ let lastFrame = performance.now();
 let lastSend = 0;
 let wakeLock = null;
 let pending = false;               // start/stop request in flight
+let wasSource = false;             // this page has been the session's audio source
+let lostControl = false;           // ...and another device has since claimed it
 
 // ------------------------------------------------------------ backend link
 function connect() {
@@ -168,11 +170,35 @@ function render() {
   if (!pending) power.checked = active;
   power.disabled = pending || !server || server.busy;
   $("power-label").textContent = active ? "Listening" : "Off";
+  const sess = server?.session || {};
+  if (active && audio && sess.you_are_source) wasSource = true;
+  // Another tab or device claimed the session: hand the mic back instead of competing.
+  // (No source at all is just a reconnect gap: our next levels make us the source again.)
+  if (active && audio && wasSource && !sess.you_are_source && sess.source_connected && !pending) {
+    stopMic();
+    lostControl = true;
+  }
+
   let detail = "Toggle to start listening";
-  if (active && !audio) detail = "Running from another device";
-  else if (active) detail = "Driving the lights from this device's mic";
-  else if (server?.last_stop_reason) detail = `Stopped: ${server.last_stop_reason}`;
+  if (active && audio) {
+    detail = "Driving the lights from this device's mic";
+  } else if (active) {
+    // Levels are fresh => someone really is sending. Stale => an orphaned session that
+    // only the watchdog will end (a closed tab, or a page reload that dropped the mic).
+    const sending = sess.source_connected && sess.idle_s != null && sess.idle_s < 2;
+    const left = Math.max(0, Math.ceil((sess.watchdog_s ?? 0) - (sess.idle_s ?? 0)));
+    detail = lostControl ? "Another device took control"
+      : sending ? "Running from another device"
+      : `No device is sending audio — stops in ${left}s`;
+  } else if (server?.last_stop_reason) {
+    detail = `Stopped: ${server.last_stop_reason}`;
+  }
   $("power-detail").textContent = detail;
+  $("take-control").hidden = !(active && !audio);
+  $("take-control").disabled = pending || !!server?.busy;
+  // Opening Settings in this tab would reload the page and drop the mic.
+  $("nav-settings").target = audio ? "_blank" : "";
+  if (!active) lostControl = false;
 
   // The session ended under us (watchdog, helper off in HA, another device).
   if (!active && audio && !pending) stopMic();
@@ -200,6 +226,7 @@ power.addEventListener("change", async () => {
       await loadSettings();
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser blocks the mic here (needs HTTPS).");
       await startMic();
+      wasSource = false; lostControl = false;
       try { await api("/api/start"); } catch (e) { stopMic(); throw e; }
     } else {
       await api("/api/stop");
@@ -208,6 +235,25 @@ power.addEventListener("change", async () => {
   } catch (e) {
     $("error").textContent = e.message || String(e);
     power.checked = false;
+  } finally {
+    pending = false; render();
+  }
+});
+
+// Take over a running session: open this device's mic and make it the only source.
+// The session keeps going (no restart, no re-snapshot of the lights).
+$("take-control").addEventListener("click", async () => {
+  $("error").textContent = "";
+  pending = true; render();
+  try {
+    await loadSettings();
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser blocks the mic here (needs HTTPS).");
+    await startMic();
+    if (ws?.readyState !== WebSocket.OPEN) { stopMic(); throw new Error("Not connected to the app"); }
+    wasSource = false; lostControl = false;
+    ws.send(JSON.stringify({ type: "claim" }));
+  } catch (e) {
+    $("error").textContent = e.message || String(e);
   } finally {
     pending = false; render();
   }

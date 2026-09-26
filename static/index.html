@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>Musical<span>Lights</span></h1>
-    <nav><a href="/" class="here">Live</a><a href="/settings">Settings</a></nav>
+    <nav><a href="/" class="here">Live</a><a href="/settings" id="nav-settings">Settings</a></nav>
   </header>
   <main>
     <section>
@@ -21,6 +21,7 @@
         <div>
           <div class="power-label" id="power-label">Off</div>
           <div class="muted" id="power-detail">Toggle to start listening</div>
+          <button id="take-control" class="primary" hidden style="margin-top:8px">Take control</button>
         </div>
         <div class="spacer"></div>
         <span class="pill" id="ha-pill">HA</span>
