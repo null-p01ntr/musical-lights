@@ -1,6 +1,10 @@
 // MusicalLights settings page. Every control saves straight to the backend.
 "use strict";
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/static/sw.js"));
+}
+
 const $ = (id) => document.getElementById(id);
 const BANDS = ["bass", "mid", "treble"];
 const DEFAULT_BANDS = { bass: [20, 250], mid: [250, 4000], treble: [4000, 16000] };

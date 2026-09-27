@@ -2,6 +2,10 @@
 // All audio maths happens here; the backend only ever sees three numbers (0..1).
 "use strict";
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/static/sw.js"));
+}
+
 const BANDS = ["bass", "mid", "treble"];
 const SEND_EVERY_MS = 50;          // 20 level updates/s to the backend
 const PEAK_DECAY_DB_S = 4;         // auto-gain: how fast a loud peak is forgotten
@@ -9,6 +13,15 @@ const PEAK_MIN_DB = -75;           // auto-gain never amplifies below this (sile
 const FIXED_PEAK_DB = -30;         // reference when auto-gain is off
 const RANGE_DB = 30;               // peak..peak-30dB maps to 1..0 at sensitivity 1
 const GATE_DB = -100;              // anything quieter is treated as silence
+
+const DEFAULT_BANDS = { bass: [20, 250], mid: [250, 4000], treble: [4000, 16000] };
+const SPEC_MIN_FREQ = 20;          // spectrum x-axis floor, Hz
+const SPEC_DECAY_DB_S = 60;        // visual-only bar decay -- separate from the band
+                                    // smoothing in analyse(), which needs
+                                    // smoothingTimeConstant=0 for beat-accurate lighting
+const bandStyle = getComputedStyle(document.documentElement);
+const BAND_COLOR = Object.fromEntries(BANDS.map((b) => [b, bandStyle.getPropertyValue(`--${b}`).trim()]));
+const SPEC_NEUTRAL = bandStyle.getPropertyValue("--line").trim();
 
 const $ = (id) => document.getElementById(id);
 const power = $("power");
@@ -112,28 +125,57 @@ function analyse(dt) {
 // ------------------------------------------------------------ drawing
 const canvas = $("wave");
 const g = canvas.getContext("2d");
+let specSmooth = null;             // per-bin decayed magnitude, visual only
 
-function drawWave() {
+function bandAt(freq, bands) {
+  for (const b of BANDS) {
+    const [lo, hi] = bands[b] || DEFAULT_BANDS[b];
+    if (freq >= lo && freq <= hi) return b;
+  }
+  return null;
+}
+
+// Log-scaled frequency spectrum, like a multiband EQ display: each configured band's
+// range is tinted behind the bars, and the bars themselves take that band's color while
+// inside it -- so the highlight and the live signal read as the same thing.
+function drawSpectrum(dt) {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
-  g.lineWidth = 2;
-  g.strokeStyle = audio ? "#ffb547" : "#3a3f50";
-  g.beginPath();
-  if (audio) {
-    audio.analyser.getFloatTimeDomainData(audio.time);
-    const step = audio.time.length / w;
-    for (let x = 0; x < w; x++) {
-      const v = audio.time[Math.floor(x * step)];
-      const y = h / 2 - v * h * 0.45 * 2;
-      x ? g.lineTo(x, y) : g.moveTo(x, y);
-    }
-  } else {
-    g.moveTo(0, h / 2); g.lineTo(w, h / 2);
+
+  const bands = settings?.bands || DEFAULT_BANDS;
+  const maxFreq = Math.min(20000, (audio?.ctx.sampleRate || 48000) / 2);
+  const logMin = Math.log(SPEC_MIN_FREQ), logSpan = Math.log(maxFreq) - logMin;
+  const freqToX = (f) => w * (Math.log(Math.max(SPEC_MIN_FREQ, f)) - logMin) / logSpan;
+
+  for (const b of BANDS) {
+    const [lo, hi] = bands[b] || DEFAULT_BANDS[b];
+    const x0 = freqToX(lo), x1 = freqToX(hi);
+    g.fillStyle = BAND_COLOR[b] + "22";
+    g.fillRect(x0, 0, Math.max(1, x1 - x0), h);
   }
-  g.stroke();
+
+  if (!audio) return; // zones alone while idle -- nothing live to show
+
+  if (!specSmooth || specSmooth.length !== audio.freq.length) {
+    specSmooth = Float32Array.from(audio.freq);
+  }
+  const minDb = audio.analyser.minDecibels, maxDb = audio.analyser.maxDecibels;
+  const binHz = audio.ctx.sampleRate / audio.analyser.fftSize;
+  const decay = SPEC_DECAY_DB_S * dt;
+
+  for (let x = 0; x < w; x++) {
+    const freq = SPEC_MIN_FREQ * Math.exp(logSpan * (x / w));
+    const bin = Math.min(audio.freq.length - 1, Math.round(freq / binHz));
+    specSmooth[bin] = Math.max(audio.freq[bin], specSmooth[bin] - decay);
+    const norm = Math.min(1, Math.max(0, (specSmooth[bin] - minDb) / (maxDb - minDb)));
+    const band = bandAt(freq, bands);
+    g.fillStyle = band ? BAND_COLOR[band] : SPEC_NEUTRAL;
+    const barH = norm * h;
+    g.fillRect(x, h - barH, 1, barH);
+  }
 }
 
 function frame(now) {
@@ -146,7 +188,7 @@ function frame(now) {
       lastSend = now;
     }
   }
-  drawWave();
+  drawSpectrum(dt);
   const shown = audio ? levels : (server?.active ? server.levels : null) || {};
   for (const b of BANDS) {
     const v = Math.round((shown[b] || 0) * 100);
