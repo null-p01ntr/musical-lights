@@ -37,7 +37,7 @@ Requirements: Docker with Compose v2.24+, and a Home Assistant the container can
    git clone https://github.com/null-p01ntr/musical-lights.git
    cd musical-lights
    cp .env.example .env        # set HA_URL, HA_TOKEN, CERT_SAN, optionally ML_LIGHTS
-   docker compose up -d        # pulls ghcr.io/null-p01ntr/musical-lights; add --build to build locally
+   docker compose up -d        # .env's COMPOSE_FILE layers compose.prod.yaml: pulls ghcr.io/null-p01ntr/musical-lights, publishes the port
    ```
 
 3. Open `https://<host>:8445` and accept the self-signed certificate once. Browsers only
@@ -152,7 +152,7 @@ expose it to the internet.
 
 ```sh
 pip install -r requirements.txt
-python -m unittest -v tests.test_app     # 21 tests against a fake Home Assistant, no real HA needed
+python -m unittest discover -s src/tests -v     # 23 tests against a fake Home Assistant, no real HA needed
 ```
 
 Or inside the image:

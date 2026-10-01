@@ -1,14 +1,12 @@
+# Base, shared config. Add compose.prod.yaml for the published image, ports and restart
+# policy:  docker compose -f compose.yaml -f compose.prod.yaml up -d
 services:
   musical-lights:
-    image: ghcr.io/null-p01ntr/musical-lights:latest
     build: .
     container_name: musical-lights
-    restart: unless-stopped
     env_file:
       - path: .env
         required: false
-    ports:
-      - "${ML_PORT:-8445}:8443"
     # Lets HA_URL=http://host.docker.internal:8123 reach a Home Assistant that runs on
     # the same host with host networking (the usual HA container setup).
     extra_hosts:

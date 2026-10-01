@@ -3,8 +3,11 @@
 data/
 .git/
 .github/
+.claude/
+docs/
 __pycache__/
 *.pyc
 README.md
+CLAUDE.md
 LICENSE
-docker-compose.yml
+compose*.yaml

@@ -1,0 +1,7 @@
+# Production overrides on top of compose.yaml.
+services:
+  musical-lights:
+    image: ghcr.io/null-p01ntr/musical-lights:${ML_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${ML_PORT:-8445}:8443"
