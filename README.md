@@ -1,7 +1,15 @@
-# MusicalLights
+<p align="center">
+  <img src="src/static/icons/icon-512.png" alt="MusicalLights logo" width="160" height="160">
+</p>
 
-Make your Home Assistant lights follow the music. Open a web page on a phone or laptop,
-toggle it on, and the room's lights pulse with the bass, mids and treble the mic hears.
+<h1 align="center">MusicalLights</h1>
+
+<p align="center">
+  <strong>Make your Home Assistant lights follow the music.</strong>
+</p>
+
+Open a web page on a phone or laptop, toggle it on, and the room's lights pulse with the
+bass, mids and treble the mic hears.
 
 - **Three bands, one light each (or several).** Bass, mid and treble levels drive light
   brightness. On/off devices (plugs, switch-backed lamps) turn on when their band crosses a
