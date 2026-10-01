@@ -5,3 +5,4 @@ __pycache__/
 *.key
 *.pem
 .claude/settings.local.json
+.venv/

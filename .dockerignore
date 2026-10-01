@@ -11,3 +11,4 @@ README.md
 CLAUDE.md
 LICENSE
 compose*.yaml
+.venv/

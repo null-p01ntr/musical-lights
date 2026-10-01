@@ -7,8 +7,8 @@ description: Run the full verification pass (syntax, unit/e2e tests, config sani
 
 Run, in order, and report each result faithfully (never claim a pass you didn't see):
 
-1. `python3 -m py_compile src/app.py src/tests/test_app.py`
-2. `python3 -m unittest discover -s src/tests -v`
+1. `.venv/bin/python -m py_compile src/app.py src/tests/test_app.py` (create the venv first if missing, see CLAUDE.md)
+2. `.venv/bin/python -m unittest discover -s src/tests -v`
 3. If `Dockerfile`, `compose*.yaml` or `src/entrypoint.sh` changed: `docker compose config -q`,
    `docker compose -f compose.yaml -f compose.prod.yaml config -q` and `sh -n src/entrypoint.sh`.
 4. If `src/static/` changed: check that every file referenced by `src/static/index.html`,

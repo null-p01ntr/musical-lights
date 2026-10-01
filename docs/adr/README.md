@@ -21,3 +21,4 @@ not recover from the code alone. One file per decision, numbered, never deleted.
 | [0007](0007-single-file-backend-no-frontend-build.md) | Single-file backend, no frontend build step | accepted |
 | [0008](0008-agentic-development-structure.md) | Claude-controlled development structure | accepted |
 | [0009](0009-repository-layout.md) | Repository layout: src/, docs/, base + prod compose | accepted |
+| [0010](0010-agent-harness-guardrails.md) | Agent harness guardrails: git pull only, secrets protected | accepted |
